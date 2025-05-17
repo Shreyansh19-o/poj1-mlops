@@ -1,3 +1,5 @@
+import os
+import json
 import sys
 from typing import Tuple
 
@@ -39,12 +41,12 @@ class ModelTrainer:
 
             # Initialize RandomForestClassifier with specified parameters
             model = RandomForestClassifier(
-                n_estimators = self.model_trainer_config._n_estimators,
-                min_samples_split = self.model_trainer_config._min_samples_split,
-                min_samples_leaf = self.model_trainer_config._min_samples_leaf,
-                max_depth = self.model_trainer_config._max_depth,
-                criterion = self.model_trainer_config._criterion,
-                random_state = self.model_trainer_config._random_state
+                n_estimators=self.model_trainer_config._n_estimators,
+                min_samples_split=self.model_trainer_config._min_samples_split,
+                min_samples_leaf=self.model_trainer_config._min_samples_leaf,
+                max_depth=self.model_trainer_config._max_depth,
+                criterion=self.model_trainer_config._criterion,
+                random_state=self.model_trainer_config._random_state
             )
 
             # Fit the model
@@ -60,8 +62,9 @@ class ModelTrainer:
             recall = recall_score(y_test, y_pred)
 
             # Creating metric artifact
-            metric_artifact = ClassificationMetricArtifact(f1_score=f1, precision_score=precision, recall_score=recall)
+            metric_artifact = ClassificationMetricArtifact(f1_score=f1, precision_score=precision, recall_score=recall, accuracy_score=accuracy)
             return model, metric_artifact
+            
         
         except Exception as e:
             raise MyException(e, sys) from e
@@ -97,18 +100,32 @@ class ModelTrainer:
                 raise Exception("No model found with score above the base score")
 
             # Save the final model object that includes both preprocessing and the trained model
-            logging.info("Saving new model as performace is better than previous one.")
+            logging.info("Saving new model as performance is better than previous one.")
             my_model = MyModel(preprocessing_object=preprocessing_obj, trained_model_object=trained_model)
             save_object(self.model_trainer_config.trained_model_file_path, my_model)
             logging.info("Saved final model object that includes both preprocessing and the trained model")
-
+            
             # Create and return the ModelTrainerArtifact
             model_trainer_artifact = ModelTrainerArtifact(
+                trained_model_info_path=self.model_trainer_config.trained_model_info_path,
                 trained_model_file_path=self.model_trainer_config.trained_model_file_path,
-                metric_artifact=metric_artifact,
+                metric_artifact=metric_artifact
             )
-            logging.info(f"Model trainer artifact: {model_trainer_artifact}")
-            return model_trainer_artifact
+            logging.info("Model training completed successfully and info is saved")
+
+            # Optionally save metrics to a file if needed
+            report_dir = os.path.dirname(self.model_trainer_config.trained_model_info_path)
+            os.makedirs(report_dir, exist_ok=True)
+            model_info = {
+                "accuracy": metric_artifact.accuracy_score,
+                "f1_score": metric_artifact.f1_score,
+                "precision_score": metric_artifact.precision_score,
+                "recall_score": metric_artifact.recall_score
+            }
+            with open(self.model_trainer_config.trained_model_info_path, "w") as report_file:
+                json.dump(model_info, report_file, indent=4)
+
+            
         
         except Exception as e:
             raise MyException(e, sys) from e
